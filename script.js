@@ -656,7 +656,7 @@ class AnnotationManager {
       ${publicUrl}
 
       ### Preview Image URL:
-      ${publicUrl}preview.jpg
+      ${publicUrl}/preview.jpg
 
       ### Test Social Media Preview:
       1. Wait 5 minutes after pushing to GitHub
@@ -686,7 +686,7 @@ class AnnotationManager {
       2. **Upload to GitHub** using the commands in DEPLOYMENT.md
       3. **Wait 5 minutes** for GitHub Pages to update
       4. **Test your link:** ${publicUrl}
-      5. **Test the preview image:** ${publicUrl}preview.jpg
+      5. **Test the preview image:** ${publicUrl}/preview.jpg
 
       **Important:** The preview will now show your image in its original aspect ratio.
 
@@ -715,7 +715,7 @@ class AnnotationManager {
       <meta property="og:url" content="${publicUrl}">
       <meta property="og:type" content="website">
       <meta property="og:site_name" content="Annotation Hub">
-      <meta property="og:image" content="${publicUrl}preview.jpg">
+      <meta property="og:image" content="${publicUrl}/preview.jpg">
       <meta property="og:image:width" content="${imageDimensions.width}">
       <meta property="og:image:height" content="${imageDimensions.height}">
 
@@ -724,7 +724,7 @@ class AnnotationManager {
       <meta name="twitter:description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
       )}">
-      <meta name="twitter:image" content="${publicUrl}preview.jpg">
+      <meta name="twitter:image" content="${publicUrl}/preview.jpg">
 
       <meta name="description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
