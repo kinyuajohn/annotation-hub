@@ -432,7 +432,7 @@ createDeploymentInstructions(folderName, metadata) {
       ${publicUrl}
 
       ### Preview  Image URL (test this!):
-      ${publicUrl}preview.jpg
+      ${publicUrl}/preview.jpg
 
       ### Test Social Media Preview:
       1. Wait 5 minutes after pushing to GitHub
@@ -441,7 +441,7 @@ createDeploymentInstructions(folderName, metadata) {
       4. Test with Twitter Validator: https://cards-dev.twitter.com/validator
 
       ### Troubleshooting:
-      - If preview doesn't show, check that \`preview.jpg\` exists at: ${publicUrl}preview.jpg
+      - If preview doesn't show, check that \`preview.jpg\` exists at: ${publicUrl}/preview.jpg
       - Facebook caches images - use the debugger to "Scrape Again"
       - Ensure all files are in the correct folder structure
       `;  
@@ -458,7 +458,7 @@ showDeploymentInstructions(folderName) {
     2. **Upload to GitHub** using the commands in DEPLOYMENT.md
     3. **Wait 5 minutes** for GitHub Pages to update
     4. **Test your link:** ${publicUrl}
-    5. **Test the preview image:** ${publicUrl}preview.jpg
+    5. **Test the preview image:** ${publicUrl}/preview.jpg
 
     **Important:** The preview image will only work after you've uploaded BOTH files to GitHub and they're publicly accessible.
 
@@ -490,7 +490,7 @@ showDeploymentInstructions(folderName) {
       <meta property="og:url" content="${publicUrl}">
       <meta property="og:type" content="website">
       <meta property="og:site_name" content="Annotation Hub">
-      <meta property="og:image" content="${publicUrl}preview.jpg">
+      <meta property="og:image" content="${publicUrl}/preview.jpg">
       <meta property="og:image:width" content="1200">
       <meta property="og:image:height" content="630">
 
@@ -499,7 +499,7 @@ showDeploymentInstructions(folderName) {
       <meta name="twitter:description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
       )}">
-      <meta name="twitter:image" content="${publicUrl}preview.jpg">
+      <meta name="twitter:image" content="${publicUrl}/preview.jpg">
 
       <meta name="description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
