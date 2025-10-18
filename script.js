@@ -213,53 +213,47 @@ class AnnotationManager {
       return;
     }
 
-    if (new Date(expiryDate) < new Date()) {
-      this.showError("Expiry date must be in the future");
-      return;
-    }
-
     try {
       this.showLoading();
 
       const fileId = this.generateFileId();
-      const fileName = customSlug
-        ? `${customSlug}.html`
-        : `annotation-${fileId}.html`;
+      const folderName = customSlug || `annotation-${fileId}`;
+      const fileName = "index.html";
 
       let fileContent = await this.readFileAsText(file);
 
-      // Generate metadata object
+      // Extract the first image from the HTML
+      const imageData = await this.extractFirstImage(fileContent, folderName);
+
+      // Generate metadata
       const metadata = {
         id: fileId,
+        folderName: folderName,
         fileName: fileName,
         originalName: file.name,
         expiryDate: expiryDate,
         created: new Date().toISOString(),
         slug: customSlug || fileId,
         description: description,
-        publicUrl: this.generatePublicUrl(fileName),
+        publicUrl: this.generatePublicUrl(folderName),
         fileSize: this.formatFileSize(file.size),
+        hasPreviewImage: !!imageData,
       };
 
-      // Generate preview metadata
-      const previewData = await this.generatePreviewMetadata(
+      // Generate enhanced HTML with proper meta tags
+      const enhancedContent = this.generateEnhancedHTML(
         fileContent,
-        metadata
+        metadata,
+        imageData
       );
 
-      // Inject meta tags into the HTML
-      const enhancedContent = this.injectMetaTags(
-        fileContent,
-        previewData,
+      // Create a zip file containing both HTML and image
+      await this.createAnnotationPackage(
+        folderName,
+        enhancedContent,
+        imageData,
         metadata
       );
-
-      // Download the enhanced file
-      this.downloadFile(fileName, enhancedContent);
-
-      // Update metadata with preview info
-      metadata.previewTitle = previewData.title;
-      metadata.previewDescription = previewData.description;
 
       this.metadata[fileId] = metadata;
       this.saveMetadata();
@@ -268,6 +262,220 @@ class AnnotationManager {
       console.error("Upload error:", error);
       this.showError("Error processing file: " + error.message);
     }
+  }
+
+  async extractFirstImage(htmlContent, folderName) {
+    try {
+      // Parse HTML to find images
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, "text/html");
+
+      // Look for images in this order: img tags, canvas elements, background images
+      const imgTags = doc.querySelectorAll("img[src]");
+
+      for (let img of imgTags) {
+        const src = img.getAttribute("src");
+
+        // Skip data URLs and external URLs for now
+        if (src.startsWith("data:") || src.startsWith("http")) {
+          continue;
+        }
+
+        // If it's a relative path, we'll handle it in the packaging
+        if (!src.startsWith("http")) {
+          return {
+            originalSrc: src,
+            type: "relative",
+            fileName: this.getFileNameFromPath(src),
+          };
+        }
+      }
+
+      // If no suitable images found, return null
+      return null;
+    } catch (error) {
+      console.warn("Error extracting image:", error);
+      return null;
+    }
+  }
+
+  getFileNameFromPath(path) {
+    return path.split("/").pop().split("?")[0];
+  }
+
+  generateEnhancedHTML(originalContent, metadata, imageData) {
+    // Extract title from original content
+    const titleMatch =
+      originalContent.match(/<title>(.*?)<\/title>/i) ||
+      originalContent.match(/<h1[^>]*>(.*?)<\/h1>/i);
+
+    const title = titleMatch
+      ? titleMatch[1].replace(/<[^>]*>/g, "").trim()
+      : metadata.originalName.replace(".html", "");
+
+    const description =
+      metadata.description || "An annotated image shared via Annotation Hub";
+
+    // Generate preview image URL
+    const previewImageUrl = imageData
+      ? `${this.generatePublicUrl(metadata.folderName)}/preview.jpg`
+      : `${window.location.origin}${window.location.pathname.replace(
+          "index.html",
+          ""
+        )}preview-image.jpg`;
+
+    const metaTags = `
+      <!-- Social Media Preview Tags -->
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${this.escapeHtml(title)}</title>
+      <meta name="description" content="${this.escapeHtml(description)}">
+
+      <!-- Open Graph Meta Tags -->
+      <meta property="og:title" content="${this.escapeHtml(title)}">
+      <meta property="og:description" content="${this.escapeHtml(description)}">
+      <meta property="og:url" content="${metadata.publicUrl}">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="Annotation Hub">
+      <meta property="og:image" content="${previewImageUrl}">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
+
+      <!-- Twitter Card Meta Tags -->
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="${this.escapeHtml(title)}">
+      <meta name="twitter:description" content="${this.escapeHtml(
+        description
+      )}">
+      <meta name="twitter:image" content="${previewImageUrl}">
+              `.trim();
+
+    // Inject meta tags into the original HTML
+    let enhancedContent = originalContent;
+
+    // Remove existing head content and replace with our enhanced version
+    const headMatch = enhancedContent.match(/<head[^>]*>[\s\S]*?<\/head>/i);
+    if (headMatch) {
+      enhancedContent = enhancedContent.replace(
+        /<head[^>]*>[\s\S]*?<\/head>/i,
+        `<head>\n${metaTags}\n</head>`
+      );
+    } else {
+      // No head tag found, insert at beginning
+      enhancedContent = `<head>\n${metaTags}\n</head>\n${enhancedContent}`;
+    }
+
+    return enhancedContent;
+  }
+
+  async createAnnotationPackage(folderName, htmlContent, imageData, metadata) {
+    // Create a zip file using JSZip
+    const zip = new JSZip();
+
+    // Add the HTML file
+    zip.file(`${folderName}/index.html`, htmlContent);
+
+    // Add instructions file
+    const instructions = this.createInstructionsFile(metadata);
+    zip.file(`${folderName}/README.md`, instructions);
+
+    // Create the zip file
+    const zipContent = await zip.generateAsync({ type: "blob" });
+
+    // Download the zip file
+    this.downloadZipFile(zipContent, `${folderName}.zip`);
+
+    // Show instructions for manual image handling
+    if (imageData) {
+      this.showImageInstructions(folderName, imageData);
+    }
+  }
+
+  createInstructionsFile(metadata) {
+    return `# Annotation: ${metadata.originalName}
+
+      ## Files to Upload to GitHub:
+
+      1. **${metadata.folderName}/index.html** - The main annotation file
+      2. **${metadata.folderName}/preview.jpg** - Preview image (see instructions below)
+
+      ## GitHub Commands:
+
+      \`\`\`bash
+      # Create the folder
+      mkdir annotations/${metadata.folderName}
+
+      # Add all files
+      git add annotations/${metadata.folderName}/
+
+      # Commit changes
+      git commit -m "feat: add annotation ${metadata.folderName}"
+
+      # Push to GitHub
+      git push origin main
+      \`\`\`
+
+      ## Public URL:
+      ${metadata.publicUrl}
+
+      ## Preview Image Setup:
+      1. Take a screenshot of your annotation
+      2. Save it as 'preview.jpg' 
+      3. Place it in the '${metadata.folderName}' folder
+      4. The image should be 1200x630 pixels for best results
+      `;
+  }
+
+  showImageInstructions(folderName, imageData) {
+    const instructions = `
+      ## Important: Preview Image Setup
+
+      To enable image previews when sharing your link:
+
+      1. **Extract the image from your original files:**
+        - Look for: ${imageData.originalSrc}
+        - Save it as: \`preview.jpg\`
+
+      2. **Create the folder structure:**
+      \`\`\`
+      annotations/
+      └── ${folderName}/
+          ├── index.html
+          └── preview.jpg
+      \`\`\`
+
+      3. **Upload to GitHub:**
+      \`\`\`bash
+      git add annotations/${folderName}/
+      git commit -m "feat: add ${folderName} with preview"
+      git push
+      \`\`\`
+
+      The image preview will work once you've added the preview.jpg file!
+        `;
+
+    // You could show this in a modal or alert
+    console.log(instructions);
+    alert(
+      "Check the console for important instructions about setting up the preview image!"
+    );
+  }
+
+  downloadZipFile(zipContent, fileName) {
+    const url = URL.createObjectURL(zipContent);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  generatePublicUrl(folderName) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const basePath = baseUrl.replace("index.html", "");
+    return `${basePath}annotations/${folderName}/`;
   }
 
   injectMetaTags(originalContent, previewData, metadata) {

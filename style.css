@@ -642,3 +642,47 @@ body {
 .result-card {
     animation: fadeIn 0.3s ease-out;
 }
+
+.image-instructions {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: var(--radius);
+}
+
+.instructions-card h4 {
+    color: #856404;
+    margin-bottom: 1rem;
+}
+
+.folder-structure pre {
+    background: #1a1a1a;
+    color: #00ff00;
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    margin: 0.5rem 0;
+    overflow-x: auto;
+}
+
+.steps ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.steps li {
+    margin-bottom: 0.5rem;
+}
+
+.git-commands code {
+    background: #1a1a1a;
+    color: #00ff00;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    display: block;
+    margin: 0.25rem 0;
+}
