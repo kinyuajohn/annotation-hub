@@ -137,13 +137,70 @@ class AnnotationManager {
     });
   }
 
+  async generatePreviewMetadata(htmlContent, metadata) {
+    // Extract title from HTML content
+    const titleMatch =
+      htmlContent.match(/<title>(.*?)<\/title>/i) ||
+      htmlContent.match(/<h1[^>]*>(.*?)<\/h1>/i) ||
+      htmlContent.match(/<h2[^>]*>(.*?)<\/h2>/i);
+
+    const title = titleMatch
+      ? titleMatch[1].replace(/<[^>]*>/g, "").trim()
+      : metadata.originalName.replace(".html", "");
+
+    // Extract description from content or use provided description
+    const descMatch =
+      htmlContent.match(/<meta name="description" content="(.*?)"/i) ||
+      htmlContent.match(/<p[^>]*>(.*?)<\/p>/i);
+
+    const description =
+      metadata.description ||
+      (descMatch
+        ? descMatch[1].replace(/<[^>]*>/g, "").substring(0, 160) + "..."
+        : "An annotated image shared via Annotation Hub");
+
+    // Use static preview image
+    const baseUrl = window.location.origin + window.location.pathname;
+    const basePath = baseUrl.replace("index.html", "");
+    const previewImageUrl = `${basePath}preview-image.jpg`;
+
+    // Generate Open Graph meta tags
+    const previewMetaTags = `
+      <!-- Social Media Preview Tags -->
+      <meta property="og:title" content="${this.escapeHtml(title)}">
+      <meta property="og:description" content="${this.escapeHtml(description)}">
+      <meta property="og:url" content="${metadata.publicUrl}">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="Annotation Hub">
+      <meta property="og:image" content="${previewImageUrl}">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
+
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="${this.escapeHtml(title)}">
+      <meta name="twitter:description" content="${this.escapeHtml(
+        description
+      )}">
+      <meta name="twitter:image" content="${previewImageUrl}">
+
+      <meta name="description" content="${this.escapeHtml(description)}">
+              `.trim();
+
+    return { title, description, previewMetaTags, previewImageUrl };
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   async handleFileUpload() {
     const fileInput = document.getElementById("fileInput");
     const expiryDate = document.getElementById("expiryDate").value;
     const customSlug = document.getElementById("customSlug").value;
     const description = document.getElementById("previewDescription").value;
 
-    // Validate file selection
     if (!fileInput.files.length) {
       this.showError("Please select a file first");
       return;
@@ -151,13 +208,11 @@ class AnnotationManager {
 
     const file = fileInput.files[0];
 
-    // Validate file type
     if (!file.type.includes("html") && !file.name.endsWith(".html")) {
       this.showError("Please select an HTML file");
       return;
     }
 
-    // Validate expiry date
     if (new Date(expiryDate) < new Date()) {
       this.showError("Expiry date must be in the future");
       return;
@@ -171,35 +226,91 @@ class AnnotationManager {
         ? `${customSlug}.html`
         : `annotation-${fileId}.html`;
 
-      const fileContent = await this.readFileAsText(file);
+      let fileContent = await this.readFileAsText(file);
 
-      // Download the file to user's computer
-      this.downloadFile(fileName, fileContent);
-
-      // Generate public URL
-      const publicUrl = this.generatePublicUrl(fileName);
-
-      // Save metadata
-      this.metadata[fileId] = {
+      // Generate metadata object
+      const metadata = {
         id: fileId,
         fileName: fileName,
         originalName: file.name,
         expiryDate: expiryDate,
         created: new Date().toISOString(),
         slug: customSlug || fileId,
-        description:
-          description ||
-          `Annotation created on ${new Date().toLocaleDateString()}`,
-        publicUrl: publicUrl,
+        description: description,
+        publicUrl: this.generatePublicUrl(fileName),
         fileSize: this.formatFileSize(file.size),
       };
 
+      // Generate preview metadata
+      const previewData = await this.generatePreviewMetadata(
+        fileContent,
+        metadata
+      );
+
+      // Inject meta tags into the HTML
+      const enhancedContent = this.injectMetaTags(
+        fileContent,
+        previewData,
+        metadata
+      );
+
+      // Download the enhanced file
+      this.downloadFile(fileName, enhancedContent);
+
+      // Update metadata with preview info
+      metadata.previewTitle = previewData.title;
+      metadata.previewDescription = previewData.description;
+
+      this.metadata[fileId] = metadata;
       this.saveMetadata();
-      this.showSuccess(this.metadata[fileId]);
+      this.showSuccess(metadata);
     } catch (error) {
       console.error("Upload error:", error);
       this.showError("Error processing file: " + error.message);
     }
+  }
+
+  injectMetaTags(originalContent, previewData, metadata) {
+    // Remove existing meta tags to avoid duplicates
+    let content = originalContent
+      .replace(/<meta property="og:[^>]*>/gi, "")
+      .replace(/<meta name="twitter:[^>]*>/gi, "")
+      .replace(/<meta name="description"[^>]*>/gi, "");
+
+    // Find the head tag and insert meta tags
+    const headEndMatch = content.match(/<\/head>/i);
+
+    if (headEndMatch) {
+      // Insert before closing head tag
+      content = content.replace(
+        /<\/head>/i,
+        `\n${previewData.previewMetaTags}\n</head>`
+      );
+    } else {
+      // No head tag found, create one
+      const bodyMatch = content.match(/<body>/i);
+      if (bodyMatch) {
+        content = content.replace(
+          /<body>/i,
+          `<head>\n${previewData.previewMetaTags}\n</head>\n<body>`
+        );
+      } else {
+        content = `<head>\n${previewData.previewMetaTags}\n</head>\n` + content;
+      }
+    }
+
+    // Ensure there's a title tag
+    if (!content.includes("<title>")) {
+      const headMatch = content.match(/<head>/i);
+      if (headMatch) {
+        content = content.replace(
+          /<head>/i,
+          `<head>\n<title>${previewData.title}</title>`
+        );
+      }
+    }
+
+    return content;
   }
 
   generateFileId() {
