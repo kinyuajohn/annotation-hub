@@ -196,79 +196,6 @@ class AnnotationManager {
     return div.innerHTML;
   }
 
-  // async handleFileUpload() {
-  //   const fileInput = document.getElementById("fileInput");
-  //   const expiryDate = document.getElementById("expiryDate").value;
-  //   const customSlug = document.getElementById("customSlug").value;
-  //   const description = document.getElementById("previewDescription").value;
-
-  //   if (!fileInput.files.length) {
-  //     this.showError("Please select a file first");
-  //     return;
-  //   }
-
-  //   const file = fileInput.files[0];
-
-  //   if (!file.type.includes("html") && !file.name.endsWith(".html")) {
-  //     this.showError("Please select an HTML file");
-  //     return;
-  //   }
-
-  //   try {
-  //     this.showLoading();
-
-  //     const fileId = this.generateFileId();
-  //     const folderName = customSlug || `annotation-${fileId}`;
-
-  //     let fileContent = await this.readFileAsText(file);
-
-  //     // Extract title from original content
-  //     const title =
-  //       this.extractTitle(fileContent) || file.name.replace(".html", "");
-
-  //     // Generate preview image
-  //     const previewImageData = await this.generatePreviewImage(
-  //       title,
-  //       description
-  //     );
-
-  //     // Create the folder structure files
-  //     await this.createAnnotationFiles(
-  //       folderName,
-  //       fileContent,
-  //       previewImageData,
-  //       {
-  //         title: title,
-  //         description: description,
-  //         expiryDate: expiryDate,
-  //         originalName: file.name,
-  //         fileId: fileId,
-  //         customSlug: customSlug,
-  //       }
-  //     );
-
-  //     // Save metadata
-  //     const metadata = {
-  //       id: fileId,
-  //       folderName: folderName,
-  //       originalName: file.name,
-  //       expiryDate: expiryDate,
-  //       created: new Date().toISOString(),
-  //       slug: customSlug || fileId,
-  //       description: description,
-  //       publicUrl: this.generatePublicUrl(folderName),
-  //       fileSize: this.formatFileSize(file.size),
-  //     };
-
-  //     this.metadata[fileId] = metadata;
-  //     this.saveMetadata();
-  //     this.showSuccess(metadata);
-  //   } catch (error) {
-  //     console.error("Upload error:", error);
-  //     this.showError("Error processing file: " + error.message);
-  //   }
-  // }
-
   setupImageUpload() {
     const imageInput = document.getElementById("previewImage");
     const imageUploadArea = document.getElementById("imageUploadArea");
@@ -453,32 +380,24 @@ class AnnotationManager {
       const img = new Image();
 
       img.onload = () => {
-        // Resize image to optimal social media size (1200x630)
-        const maxWidth = 1200;
-        const maxHeight = 630;
+        // Use the original image dimensions - no forced resizing to 1200x630
+        const originalWidth = img.width;
+        const originalHeight = img.height;
 
-        let { width, height } = this.calculateAspectRatioFit(
-          img.width,
-          img.height,
-          maxWidth,
-          maxHeight
-        );
+        // Set canvas to original image size
+        canvas.width = originalWidth;
+        canvas.height = originalHeight;
 
-        canvas.width = maxWidth;
-        canvas.height = maxHeight;
+        // Draw image directly without background or borders
+        ctx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
-        // Create background
-        ctx.fillStyle = "#667eea";
-        ctx.fillRect(0, 0, maxWidth, maxHeight);
-
-        // Draw image centered
-        const x = (maxWidth - width) / 2;
-        const y = (maxHeight - height) / 2;
-        ctx.drawImage(img, x, y, width, height);
-
-        // Convert to data URL
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-        resolve(dataUrl);
+        // Convert to data URL with original quality
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+        resolve({
+          dataUrl: dataUrl,
+          width: originalWidth,
+          height: originalHeight,
+        });
       };
 
       img.onerror = reject;
@@ -561,44 +480,36 @@ class AnnotationManager {
 
   async generatePreviewImage(title, description) {
     return new Promise((resolve) => {
-      // Create offscreen canvas
+      // Use standard social media size but keep it clean
       const canvas = document.createElement("canvas");
       canvas.width = 1200;
       canvas.height = 630;
       const ctx = canvas.getContext("2d");
 
-      // Background gradient
-      const gradient = ctx.createLinearGradient(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-      gradient.addColorStop(0, "#667eea");
-      gradient.addColorStop(1, "#764ba2");
-      ctx.fillStyle = gradient;
+      // Clean white background (no gradient)
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Add annotation icon
-      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+      // Add annotation icon with subtle color
+      ctx.fillStyle = "#667eea";
       ctx.font = "bold 80px Arial";
       ctx.textAlign = "center";
-      ctx.fillText("📋", canvas.width / 2, 120);
+      ctx.fillText("📋", canvas.width / 2, 150);
 
       // Add title
       ctx.font = 'bold 56px "Inter", Arial, sans-serif';
-      ctx.fillStyle = "#ffffff";
-      this.wrapText(ctx, title, canvas.width / 2, 220, canvas.width - 200, 65);
+      ctx.fillStyle = "#333333";
+      this.wrapText(ctx, title, canvas.width / 2, 250, canvas.width - 200, 65);
 
       // Add description
       if (description) {
         ctx.font = '32px "Inter", Arial, sans-serif';
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fillStyle = "#666666";
         this.wrapText(
           ctx,
           description,
           canvas.width / 2,
-          350,
+          380,
           canvas.width - 200,
           40
         );
@@ -606,12 +517,16 @@ class AnnotationManager {
 
       // Add website URL
       ctx.font = '24px "Inter", Arial, sans-serif';
-      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.fillStyle = "#999999";
       ctx.fillText("Annotation Hub", canvas.width / 2, 530);
 
       // Convert to data URL
       const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-      resolve(dataUrl);
+      resolve({
+        dataUrl: dataUrl,
+        width: 1200,
+        height: 630,
+      });
     });
   }
 
@@ -648,11 +563,15 @@ class AnnotationManager {
     previewImageData,
     metadata
   ) {
-    // Create enhanced HTML with proper meta tags
+    // Create enhanced HTML with proper meta tags and dynamic dimensions
     const enhancedHtml = this.createEnhancedHTML(
       originalHtml,
       folderName,
-      metadata
+      metadata,
+      {
+        width: previewImageData.width,
+        height: previewImageData.height,
+      }
     );
 
     // Create a zip file with both files
@@ -662,13 +581,14 @@ class AnnotationManager {
     zip.file(`${folderName}/index.html`, enhancedHtml);
 
     // Convert data URL to blob and add preview image
-    const previewBlob = this.dataURLtoBlob(previewImageData);
+    const previewBlob = this.dataURLtoBlob(previewImageData.dataUrl);
     zip.file(`${folderName}/preview.jpg`, previewBlob);
 
     // Create deployment instructions
     const instructions = this.createDeploymentInstructions(
       folderName,
-      metadata
+      metadata,
+      previewImageData
     );
     zip.file(`${folderName}/DEPLOYMENT.md`, instructions);
 
@@ -677,101 +597,115 @@ class AnnotationManager {
     this.downloadFile(`${folderName}.zip`, zipContent);
 
     // Show success message with important notes
-    this.showDeploymentInstructions(folderName);
+    this.showDeploymentInstructions(folderName, previewImageData);
   }
 
-  createDeploymentInstructions(folderName, metadata) {
+  createDeploymentInstructions(folderName, metadata, imageData) {
     const publicUrl = this.generatePublicUrl(folderName);
     const imageType = metadata.usesCustomImage
-      ? "Custom uploaded image"
+      ? `Custom uploaded image (${imageData.width}×${imageData.height})`
       : "Automatically generated preview";
 
     return `# Deployment Instructions
 
-    ## Your Annotation: ${metadata.originalName}
+      ## Your Annotation: ${metadata.originalName}
 
-    ### Files to Upload:
-    - \`index.html\` - Your annotation with social media tags
-    - \`preview.jpg\` - ${imageType}
+      ### Files to Upload:
+      - \`index.html\` - Your annotation with social media tags
+      - \`preview.jpg\` - ${imageType}
 
-    ### Preview Image:
-    ${
-      metadata.usesCustomImage
-        ? "✅ Using your custom uploaded image for social media previews"
-        : "✅ Generated a default preview image based on your title and description"
-    }
+      ### Image Details:
+      - **Dimensions:** ${imageData.width} × ${imageData.height} pixels
+      - **Aspect Ratio:** ${this.calculateAspectRatio(
+        imageData.width,
+        imageData.height
+      )}
 
-    ### Folder Structure on GitHub:
-    \`\`\`
-    your-repo/
-    └── annotations/
-        └── ${folderName}/
-            ├── index.html
-            └── preview.jpg
-    \`\`\`
+      ### Preview Image:
+      ${
+        metadata.usesCustomImage
+          ? "✅ Using your original image with preserved dimensions"
+          : "✅ Generated a clean preview image"
+      }
 
-    ### Git Commands:
-    \`\`\`bash
-    # Navigate to your repository
-    cd your-repo-name
+      ### Folder Structure on GitHub:
+      \`\`\`
+      your-repo/
+      └── annotations/
+          └── ${folderName}/
+              ├── index.html
+              └── preview.jpg
+      \`\`\`
 
-    # Create the folder and add files
-    mkdir -p annotations/${folderName}
-    cp ${folderName}/* annotations/${folderName}/
+      ### Git Commands:
+      \`\`\`bash
+      # Navigate to your repository
+      cd your-repo-name
 
-    # Commit and push
-    git add annotations/${folderName}/
-    git commit -m "Add annotation: ${folderName}"
-    git push origin main
-    \`\`\`
+      # Create the folder and add files
+      mkdir -p annotations/${folderName}
+      cp ${folderName}/* annotations/${folderName}/
 
-    ### Your Annotation URL:
-    ${publicUrl}
+      # Commit and push
+      git add annotations/${folderName}/
+      git commit -m "Add annotation: ${folderName}"
+      git push origin main
+      \`\`\`
 
-    ### Preview Image URL:
-    ${publicUrl}preview.jpg
+      ### Your Annotation URL:
+      ${publicUrl}
 
-    ### Test Social Media Preview:
-    1. Wait 5 minutes after pushing to GitHub
-    2. Share: ${publicUrl}
-    3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
-    `;
+      ### Preview Image URL:
+      ${publicUrl}preview.jpg
+
+      ### Test Social Media Preview:
+      1. Wait 5 minutes after pushing to GitHub
+      2. Share: ${publicUrl}
+      3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
+      `;
   }
 
-  showDeploymentInstructions(folderName) {
+  calculateAspectRatio(width, height) {
+    const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+    const divisor = gcd(width, height);
+    return `${width / divisor}:${height / divisor}`;
+  }
+
+  showDeploymentInstructions(folderName, imageData) {
     const publicUrl = this.generatePublicUrl(folderName);
 
     const instructions = `
-🎉 **Annotation Generated Successfully!**
+      🎉 **Annotation Generated Successfully!**
 
-    **Next Steps:**
-    1. **Extract the downloaded zip file**
-    2. **Upload to GitHub** using the commands in DEPLOYMENT.md
-    3. **Wait 5 minutes** for GitHub Pages to update
-    4. **Test your link:** ${publicUrl}
-    5. **Test the preview image:** ${publicUrl}/preview.jpg
+      **Image Details:**
+      - Dimensions: ${imageData.width} × ${imageData.height} pixels
+      - Aspect Ratio: ${this.calculateAspectRatio(imageData.width, imageData.height)}
 
-    **Important:** The preview image will only work after you've uploaded BOTH files to GitHub and they're publicly accessible.
+      **Next Steps:**
+      1. **Extract the downloaded zip file**
+      2. **Upload to GitHub** using the commands in DEPLOYMENT.md
+      3. **Wait 5 minutes** for GitHub Pages to update
+      4. **Test your link:** ${publicUrl}
+      5. **Test the preview image:** ${publicUrl}preview.jpg
 
-    **Test your social media preview:**
-    - Facebook: https://developers.facebook.com/tools/debug/
-    - Twitter: https://cards-dev.twitter.com/validator/
-    `;
+      **Important:** The preview will now show your image in its original aspect ratio.
+
+      **Test your social media preview:**
+      - Facebook: https://developers.facebook.com/tools/debug/
+      - Twitter: https://cards-dev.twitter.com/validator/
+          `;
 
     alert(instructions);
     console.log("Deployment instructions:", instructions);
   }
 
-  createEnhancedHTML(originalHtml, folderName, metadata) {
-    // FIXED: Generate correct public URL
+  createEnhancedHTML(originalHtml, folderName, metadata, imageDimensions) {
     const publicUrl = this.generatePublicUrl(folderName);
-    // FIXED: Use correct relative path for the image
-    const previewImageUrl = `preview.jpg`; // Relative path - same folder as HTML
 
     // Extract the original title or use fallback
     const originalTitle = this.extractTitle(originalHtml) || metadata.title;
 
-    // Create enhanced meta tags with ABSOLUTE URLs for social media
+    // Create enhanced meta tags with dynamic dimensions
     const metaTags = `
       <!-- Social Media Preview Tags -->
       <meta property="og:title" content="${this.escapeHtml(originalTitle)}">
@@ -781,23 +715,23 @@ class AnnotationManager {
       <meta property="og:url" content="${publicUrl}">
       <meta property="og:type" content="website">
       <meta property="og:site_name" content="Annotation Hub">
-      <meta property="og:image" content="${publicUrl}/preview.jpg">
-      <meta property="og:image:width" content="1200">
-      <meta property="og:image:height" content="630">
+      <meta property="og:image" content="${publicUrl}preview.jpg">
+      <meta property="og:image:width" content="${imageDimensions.width}">
+      <meta property="og:image:height" content="${imageDimensions.height}">
 
       <meta name="twitter:card" content="summary_large_image">
       <meta name="twitter:title" content="${this.escapeHtml(originalTitle)}">
       <meta name="twitter:description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
       )}">
-      <meta name="twitter:image" content="${publicUrl}/preview.jpg">
+      <meta name="twitter:image" content="${publicUrl}preview.jpg">
 
       <meta name="description" content="${this.escapeHtml(
         metadata.description || "An annotated image"
       )}">
-    `.trim();
+          `.trim();
 
-    // Preserve the original HTML structure, just enhance the head
+    // ... rest of the method remains the same ...
     let enhancedHtml = originalHtml;
 
     // Remove existing meta tags to avoid duplicates
@@ -825,8 +759,12 @@ class AnnotationManager {
   }
 
   dataURLtoBlob(dataURL) {
-    const byteString = atob(dataURL.split(",")[1]);
-    const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
+    // Handle both string dataURL and object with dataUrl property
+    const actualDataURL =
+      typeof dataURL === "string" ? dataURL : dataURL.dataUrl;
+
+    const byteString = atob(actualDataURL.split(",")[1]);
+    const mimeString = actualDataURL.split(",")[0].split(":")[1].split(";")[0];
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
 
