@@ -75,6 +75,49 @@
             <!-- Form Fields -->
             <div class="form-fields">
               <div class="form-group">
+                <label for="previewImage" class="form-label">
+                  <span class="label-icon">🖼️</span>
+                  Preview Image (Optional)
+                </label>
+                <div class="image-upload-area" id="imageUploadArea">
+                  <input
+                    type="file"
+                    id="previewImage"
+                    accept="image/*"
+                    class="image-input"
+                  />
+                  <div class="image-upload-content" id="imageUploadContent">
+                    <div class="upload-icon">📷</div>
+                    <h4>Upload Custom Preview Image</h4>
+                    <p>Optional - for social media previews</p>
+                    <span class="file-types">Supports JPG, PNG, WebP</span>
+                  </div>
+                  <div
+                    class="image-preview"
+                    id="imagePreview"
+                    style="display: none"
+                  >
+                    <img id="previewImageDisplay" src="" alt="Preview" />
+                    <div class="image-info">
+                      <h5 id="previewImageName">image.jpg</h5>
+                      <span id="previewImageSize">0 KB</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="change-image-btn"
+                      onclick="document.getElementById('previewImage').click()"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+                <small class="form-help">
+                  Upload a relevant image for social media previews. If not
+                  provided, a default will be generated.
+                </small>
+              </div>
+
+              <div class="form-group">
                 <label for="expiryDate" class="form-label">
                   <span class="label-icon">📅</span>
                   Expiry Date

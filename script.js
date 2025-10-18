@@ -11,8 +11,8 @@ class AnnotationManager {
     // Initialize event listeners
     this.setupDragAndDrop();
     this.setupFileInput();
+    this.setupImageUpload(); // Add this line
     this.setupFormSubmit();
-
     console.log("Annotation Manager initialized");
   }
 
@@ -196,14 +196,180 @@ class AnnotationManager {
     return div.innerHTML;
   }
 
+  // async handleFileUpload() {
+  //   const fileInput = document.getElementById("fileInput");
+  //   const expiryDate = document.getElementById("expiryDate").value;
+  //   const customSlug = document.getElementById("customSlug").value;
+  //   const description = document.getElementById("previewDescription").value;
+
+  //   if (!fileInput.files.length) {
+  //     this.showError("Please select a file first");
+  //     return;
+  //   }
+
+  //   const file = fileInput.files[0];
+
+  //   if (!file.type.includes("html") && !file.name.endsWith(".html")) {
+  //     this.showError("Please select an HTML file");
+  //     return;
+  //   }
+
+  //   try {
+  //     this.showLoading();
+
+  //     const fileId = this.generateFileId();
+  //     const folderName = customSlug || `annotation-${fileId}`;
+
+  //     let fileContent = await this.readFileAsText(file);
+
+  //     // Extract title from original content
+  //     const title =
+  //       this.extractTitle(fileContent) || file.name.replace(".html", "");
+
+  //     // Generate preview image
+  //     const previewImageData = await this.generatePreviewImage(
+  //       title,
+  //       description
+  //     );
+
+  //     // Create the folder structure files
+  //     await this.createAnnotationFiles(
+  //       folderName,
+  //       fileContent,
+  //       previewImageData,
+  //       {
+  //         title: title,
+  //         description: description,
+  //         expiryDate: expiryDate,
+  //         originalName: file.name,
+  //         fileId: fileId,
+  //         customSlug: customSlug,
+  //       }
+  //     );
+
+  //     // Save metadata
+  //     const metadata = {
+  //       id: fileId,
+  //       folderName: folderName,
+  //       originalName: file.name,
+  //       expiryDate: expiryDate,
+  //       created: new Date().toISOString(),
+  //       slug: customSlug || fileId,
+  //       description: description,
+  //       publicUrl: this.generatePublicUrl(folderName),
+  //       fileSize: this.formatFileSize(file.size),
+  //     };
+
+  //     this.metadata[fileId] = metadata;
+  //     this.saveMetadata();
+  //     this.showSuccess(metadata);
+  //   } catch (error) {
+  //     console.error("Upload error:", error);
+  //     this.showError("Error processing file: " + error.message);
+  //   }
+  // }
+
+  setupImageUpload() {
+    const imageInput = document.getElementById("previewImage");
+    const imageUploadArea = document.getElementById("imageUploadArea");
+    const imageUploadContent = document.getElementById("imageUploadContent");
+    const imagePreview = document.getElementById("imagePreview");
+
+    // Drag and drop for images
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+      imageUploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      imageUploadArea.addEventListener(
+        eventName,
+        () => {
+          imageUploadArea.classList.add("drag-over");
+        },
+        false
+      );
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      imageUploadArea.addEventListener(
+        eventName,
+        () => {
+          imageUploadArea.classList.remove("drag-over");
+        },
+        false
+      );
+    });
+
+    imageUploadArea.addEventListener(
+      "drop",
+      (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith("image/")) {
+          this.handleImageSelection(files[0]);
+        }
+      },
+      false
+    );
+
+    imageInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        this.handleImageSelection(e.target.files[0]);
+      }
+    });
+  }
+
+  handleImageSelection(file) {
+    if (!file.type.startsWith("image/")) {
+      this.showError("Please select an image file (JPG, PNG, WebP)");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      this.showError("Image size should be less than 5MB");
+      return;
+    }
+
+    this.updateImagePreview(file);
+  }
+
+  updateImagePreview(file) {
+    const imageUploadContent = document.getElementById("imageUploadContent");
+    const imagePreview = document.getElementById("imagePreview");
+    const previewImageDisplay = document.getElementById("previewImageDisplay");
+    const previewImageName = document.getElementById("previewImageName");
+    const previewImageSize = document.getElementById("previewImageSize");
+
+    // Update file info
+    previewImageName.textContent = file.name;
+    previewImageSize.textContent = this.formatFileSize(file.size);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImageDisplay.src = e.target.result;
+
+      // Show image preview and hide upload content
+      imageUploadContent.style.display = "none";
+      imagePreview.style.display = "flex";
+    };
+    reader.readAsDataURL(file);
+  }
+
   async handleFileUpload() {
     const fileInput = document.getElementById("fileInput");
     const expiryDate = document.getElementById("expiryDate").value;
     const customSlug = document.getElementById("customSlug").value;
     const description = document.getElementById("previewDescription").value;
+    const previewImageInput = document.getElementById("previewImage");
 
     if (!fileInput.files.length) {
-      this.showError("Please select a file first");
+      this.showError("Please select an HTML file first");
       return;
     }
 
@@ -221,16 +387,24 @@ class AnnotationManager {
       const folderName = customSlug || `annotation-${fileId}`;
 
       let fileContent = await this.readFileAsText(file);
+      let previewImageData = null;
+      let usesCustomImage = false;
 
       // Extract title from original content
       const title =
         this.extractTitle(fileContent) || file.name.replace(".html", "");
 
-      // Generate preview image
-      const previewImageData = await this.generatePreviewImage(
-        title,
-        description
-      );
+      // Handle preview image (custom or generated)
+      if (previewImageInput.files.length > 0) {
+        // Use custom uploaded image
+        const imageFile = previewImageInput.files[0];
+        previewImageData = await this.processCustomImage(imageFile);
+        usesCustomImage = true;
+      } else {
+        // Generate default preview image
+        previewImageData = await this.generatePreviewImage(title, description);
+        usesCustomImage = false;
+      }
 
       // Create the folder structure files
       await this.createAnnotationFiles(
@@ -244,6 +418,7 @@ class AnnotationManager {
           originalName: file.name,
           fileId: fileId,
           customSlug: customSlug,
+          usesCustomImage: usesCustomImage,
         }
       );
 
@@ -258,15 +433,115 @@ class AnnotationManager {
         description: description,
         publicUrl: this.generatePublicUrl(folderName),
         fileSize: this.formatFileSize(file.size),
+        usesCustomImage: usesCustomImage,
+        hasPreview: true,
       };
 
       this.metadata[fileId] = metadata;
       this.saveMetadata();
-      this.showSuccess(metadata);
+      this.showSuccess(metadata, usesCustomImage);
     } catch (error) {
       console.error("Upload error:", error);
-      this.showError("Error processing file: " + error.message);
+      this.showError("Error processing files: " + error.message);
     }
+  }
+
+  async processCustomImage(imageFile) {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      img.onload = () => {
+        // Resize image to optimal social media size (1200x630)
+        const maxWidth = 1200;
+        const maxHeight = 630;
+
+        let { width, height } = this.calculateAspectRatioFit(
+          img.width,
+          img.height,
+          maxWidth,
+          maxHeight
+        );
+
+        canvas.width = maxWidth;
+        canvas.height = maxHeight;
+
+        // Create background
+        ctx.fillStyle = "#667eea";
+        ctx.fillRect(0, 0, maxWidth, maxHeight);
+
+        // Draw image centered
+        const x = (maxWidth - width) / 2;
+        const y = (maxHeight - height) / 2;
+        ctx.drawImage(img, x, y, width, height);
+
+        // Convert to data URL
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        resolve(dataUrl);
+      };
+
+      img.onerror = reject;
+      img.src = URL.createObjectURL(imageFile);
+    });
+  }
+
+  calculateAspectRatioFit(srcWidth, srcHeight, maxWidth, maxHeight) {
+    const ratio = Math.min(maxWidth / srcWidth, maxHeight / srcHeight);
+    return {
+      width: srcWidth * ratio,
+      height: srcHeight * ratio,
+    };
+  }
+
+  showSuccess(metadata, usesCustomImage) {
+    // Update the UI with success information
+    document.getElementById("shareableLink").value = metadata.publicUrl;
+    document.getElementById("previewTitle").textContent =
+      metadata.originalName.replace(".html", "");
+    document.getElementById("previewDesc").textContent =
+      metadata.description || "No description provided";
+    document.getElementById("previewUrl").textContent = new URL(
+      metadata.publicUrl
+    ).hostname;
+
+    // Update preview image in the UI
+    const previewImage = document.querySelector(
+      ".preview-image .image-placeholder"
+    );
+    if (previewImage) {
+      previewImage.textContent = usesCustomImage ? "🖼️" : "📋";
+    }
+
+    // Show custom image note
+    if (usesCustomImage) {
+      this.showCustomImageNote();
+    }
+
+    // Show results and hide form
+    document.getElementById("uploadForm").style.display = "none";
+    document.getElementById("resultCard").style.display = "block";
+
+    // Scroll to results
+    document
+      .getElementById("resultCard")
+      .scrollIntoView({ behavior: "smooth" });
+  }
+
+  showCustomImageNote() {
+    const note = document.createElement("div");
+    note.className = "custom-image-note";
+    note.innerHTML = `
+            <div class="note-icon">🎯</div>
+            <div class="note-content">
+                <strong>Custom preview image included!</strong>
+                <p>Your uploaded image will be used for social media previews.</p>
+            </div>
+        `;
+
+    const resultCard = document.getElementById("resultCard");
+    const firstSection = resultCard.querySelector(".success-header");
+    resultCard.insertBefore(note, firstSection.nextSibling);
   }
 
   extractTitle(htmlContent) {
@@ -367,9 +642,18 @@ class AnnotationManager {
     return lines;
   }
 
-  async createAnnotationFiles(folderName, originalHtml, previewImageData, metadata) {
+  async createAnnotationFiles(
+    folderName,
+    originalHtml,
+    previewImageData,
+    metadata
+  ) {
     // Create enhanced HTML with proper meta tags
-    const enhancedHtml = this.createEnhancedHTML(originalHtml, folderName, metadata);
+    const enhancedHtml = this.createEnhancedHTML(
+      originalHtml,
+      folderName,
+      metadata
+    );
 
     // Create a zip file with both files
     const zip = new JSZip();
@@ -382,7 +666,10 @@ class AnnotationManager {
     zip.file(`${folderName}/preview.jpg`, previewBlob);
 
     // Create deployment instructions
-    const instructions = this.createDeploymentInstructions(folderName, metadata);
+    const instructions = this.createDeploymentInstructions(
+      folderName,
+      metadata
+    );
     zip.file(`${folderName}/DEPLOYMENT.md`, instructions);
 
     // Generate and download zip
@@ -391,65 +678,69 @@ class AnnotationManager {
 
     // Show success message with important notes
     this.showDeploymentInstructions(folderName);
-}
+  }
 
-createDeploymentInstructions(folderName, metadata) {
+  createDeploymentInstructions(folderName, metadata) {
     const publicUrl = this.generatePublicUrl(folderName);
-    
+    const imageType = metadata.usesCustomImage
+      ? "Custom uploaded image"
+      : "Automatically generated preview";
+
     return `# Deployment Instructions
 
-      ## Your Annotation: ${metadata.originalName}
+    ## Your Annotation: ${metadata.originalName}
 
-      ### Files to Upload:
-      - \`index.html\` - Your annotation with social media tags
-      - \`preview.jpg\` - Generated preview image
+    ### Files to Upload:
+    - \`index.html\` - Your annotation with social media tags
+    - \`preview.jpg\` - ${imageType}
 
-      ### Folder Structure on GitHub:
-      \`\`\`
-      your-repo/
-      └── annotations/
-          └── ${folderName}/
-              ├── index.html
-              └── preview.jpg
-      \`\`\`
+    ### Preview Image:
+    ${
+      metadata.usesCustomImage
+        ? "✅ Using your custom uploaded image for social media previews"
+        : "✅ Generated a default preview image based on your title and description"
+    }
 
-      ### Git Commands:
-      \`\`\`bash
-      # Navigate to your repository
-      cd your-repo-name
+    ### Folder Structure on GitHub:
+    \`\`\`
+    your-repo/
+    └── annotations/
+        └── ${folderName}/
+            ├── index.html
+            └── preview.jpg
+    \`\`\`
 
-      # Create the folder and add files
-      mkdir -p annotations/${folderName}
-      cp ${folderName}/* annotations/${folderName}/
+    ### Git Commands:
+    \`\`\`bash
+    # Navigate to your repository
+    cd your-repo-name
 
-      # Commit and push
-      git add annotations/${folderName}/
-      git commit -m "Add annotation: ${folderName}"
-      git push origin main
-      \`\`\`
+    # Create the folder and add files
+    mkdir -p annotations/${folderName}
+    cp ${folderName}/* annotations/${folderName}/
 
-      ### Your Annotation URL:
-      ${publicUrl}
+    # Commit and push
+    git add annotations/${folderName}/
+    git commit -m "Add annotation: ${folderName}"
+    git push origin main
+    \`\`\`
 
-      ### Preview  Image URL (test this!):
-      ${publicUrl}/preview.jpg
+    ### Your Annotation URL:
+    ${publicUrl}
 
-      ### Test Social Media Preview:
-      1. Wait 5 minutes after pushing to GitHub
-      2. Share this URL: ${publicUrl}
-      3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
-      4. Test with Twitter Validator: https://cards-dev.twitter.com/validator
+    ### Preview Image URL:
+    ${publicUrl}preview.jpg
 
-      ### Troubleshooting:
-      - If preview doesn't show, check that \`preview.jpg\` exists at: ${publicUrl}/preview.jpg
-      - Facebook caches images - use the debugger to "Scrape Again"
-      - Ensure all files are in the correct folder structure
-      `;  
-}
+    ### Test Social Media Preview:
+    1. Wait 5 minutes after pushing to GitHub
+    2. Share: ${publicUrl}
+    3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
+    `;
+  }
 
-showDeploymentInstructions(folderName) {
+  showDeploymentInstructions(folderName) {
     const publicUrl = this.generatePublicUrl(folderName);
-    
+
     const instructions = `
 🎉 **Annotation Generated Successfully!**
 
@@ -466,10 +757,10 @@ showDeploymentInstructions(folderName) {
     - Facebook: https://developers.facebook.com/tools/debug/
     - Twitter: https://cards-dev.twitter.com/validator/
     `;
-    
+
     alert(instructions);
     console.log("Deployment instructions:", instructions);
-}
+  }
 
   createEnhancedHTML(originalHtml, folderName, metadata) {
     // FIXED: Generate correct public URL
@@ -880,26 +1171,26 @@ showDeploymentInstructions(folderName) {
     console.log("Processing file...");
   }
 
-  showSuccess(metadata) {
-    // Update the UI with success information
-    document.getElementById("shareableLink").value = metadata.publicUrl;
-    document.getElementById("previewTitle").textContent =
-      metadata.originalName.replace(".html", "");
-    document.getElementById("previewDesc").textContent =
-      metadata.description || "No description provided";
-    document.getElementById("previewUrl").textContent = new URL(
-      metadata.publicUrl
-    ).hostname;
+  // showSuccess(metadata) {
+  //   // Update the UI with success information
+  //   document.getElementById("shareableLink").value = metadata.publicUrl;
+  //   document.getElementById("previewTitle").textContent =
+  //     metadata.originalName.replace(".html", "");
+  //   document.getElementById("previewDesc").textContent =
+  //     metadata.description || "No description provided";
+  //   document.getElementById("previewUrl").textContent = new URL(
+  //     metadata.publicUrl
+  //   ).hostname;
 
-    // Show results and hide form
-    document.getElementById("uploadForm").style.display = "none";
-    document.getElementById("resultCard").style.display = "block";
+  //   // Show results and hide form
+  //   document.getElementById("uploadForm").style.display = "none";
+  //   document.getElementById("resultCard").style.display = "block";
 
-    // Scroll to results
-    document
-      .getElementById("resultCard")
-      .scrollIntoView({ behavior: "smooth" });
-  }
+  //   // Scroll to results
+  //   document
+  //     .getElementById("resultCard")
+  //     .scrollIntoView({ behavior: "smooth" });
+  // }
 
   showError(message) {
     alert("Error: " + message);
