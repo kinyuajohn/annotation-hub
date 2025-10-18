@@ -367,18 +367,9 @@ class AnnotationManager {
     return lines;
   }
 
-  async createAnnotationFiles(
-    folderName,
-    originalHtml,
-    previewImageData,
-    metadata
-  ) {
+  async createAnnotationFiles(folderName, originalHtml, previewImageData, metadata) {
     // Create enhanced HTML with proper meta tags
-    const enhancedHtml = this.createEnhancedHTML(
-      originalHtml,
-      folderName,
-      metadata
-    );
+    const enhancedHtml = this.createEnhancedHTML(originalHtml, folderName, metadata);
 
     // Create a zip file with both files
     const zip = new JSZip();
@@ -390,47 +381,130 @@ class AnnotationManager {
     const previewBlob = this.dataURLtoBlob(previewImageData);
     zip.file(`${folderName}/preview.jpg`, previewBlob);
 
-    // Create instructions file
-    const instructions = this.createInstructions(folderName, metadata);
-    zip.file(`${folderName}/README.md`, instructions);
+    // Create deployment instructions
+    const instructions = this.createDeploymentInstructions(folderName, metadata);
+    zip.file(`${folderName}/DEPLOYMENT.md`, instructions);
 
     // Generate and download zip
     const zipContent = await zip.generateAsync({ type: "blob" });
     this.downloadFile(`${folderName}.zip`, zipContent);
-  }
+
+    // Show success message with important notes
+    this.showDeploymentInstructions(folderName);
+}
+
+createDeploymentInstructions(folderName, metadata) {
+    const publicUrl = this.generatePublicUrl(folderName);
+    
+    return `# Deployment Instructions
+
+      ## Your Annotation: ${metadata.originalName}
+
+      ### Files to Upload:
+      - \`index.html\` - Your annotation with social media tags
+      - \`preview.jpg\` - Generated preview image
+
+      ### Folder Structure on GitHub:
+      \`\`\`
+      your-repo/
+      └── annotations/
+          └── ${folderName}/
+              ├── index.html
+              └── preview.jpg
+      \`\`\`
+
+      ### Git Commands:
+      \`\`\`bash
+      # Navigate to your repository
+      cd your-repo-name
+
+      # Create the folder and add files
+      mkdir -p annotations/${folderName}
+      cp ${folderName}/* annotations/${folderName}/
+
+      # Commit and push
+      git add annotations/${folderName}/
+      git commit -m "Add annotation: ${folderName}"
+      git push origin main
+      \`\`\`
+
+      ### Your Annotation URL:
+      ${publicUrl}
+
+      ### Preview  Image URL (test this!):
+      ${publicUrl}preview.jpg
+
+      ### Test Social Media Preview:
+      1. Wait 5 minutes after pushing to GitHub
+      2. Share this URL: ${publicUrl}
+      3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
+      4. Test with Twitter Validator: https://cards-dev.twitter.com/validator
+
+      ### Troubleshooting:
+      - If preview doesn't show, check that \`preview.jpg\` exists at: ${publicUrl}preview.jpg
+      - Facebook caches images - use the debugger to "Scrape Again"
+      - Ensure all files are in the correct folder structure
+      `;  
+}
+
+showDeploymentInstructions(folderName) {
+    const publicUrl = this.generatePublicUrl(folderName);
+    
+    const instructions = `
+🎉 **Annotation Generated Successfully!**
+
+    **Next Steps:**
+    1. **Extract the downloaded zip file**
+    2. **Upload to GitHub** using the commands in DEPLOYMENT.md
+    3. **Wait 5 minutes** for GitHub Pages to update
+    4. **Test your link:** ${publicUrl}
+    5. **Test the preview image:** ${publicUrl}preview.jpg
+
+    **Important:** The preview image will only work after you've uploaded BOTH files to GitHub and they're publicly accessible.
+
+    **Test your social media preview:**
+    - Facebook: https://developers.facebook.com/tools/debug/
+    - Twitter: https://cards-dev.twitter.com/validator/
+    `;
+    
+    alert(instructions);
+    console.log("Deployment instructions:", instructions);
+}
 
   createEnhancedHTML(originalHtml, folderName, metadata) {
+    // FIXED: Generate correct public URL
     const publicUrl = this.generatePublicUrl(folderName);
-    const previewImageUrl = `${publicUrl}preview.jpg`;
+    // FIXED: Use correct relative path for the image
+    const previewImageUrl = `preview.jpg`; // Relative path - same folder as HTML
 
     // Extract the original title or use fallback
     const originalTitle = this.extractTitle(originalHtml) || metadata.title;
 
-    // Create enhanced meta tags
+    // Create enhanced meta tags with ABSOLUTE URLs for social media
     const metaTags = `
-<!-- Social Media Preview Tags -->
-<meta property="og:title" content="${this.escapeHtml(originalTitle)}">
-<meta property="og:description" content="${this.escapeHtml(
-      metadata.description || "An annotated image"
-    )}">
-<meta property="og:url" content="${publicUrl}">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Annotation Hub">
-<meta property="og:image" content="${previewImageUrl}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
+      <!-- Social Media Preview Tags -->
+      <meta property="og:title" content="${this.escapeHtml(originalTitle)}">
+      <meta property="og:description" content="${this.escapeHtml(
+        metadata.description || "An annotated image"
+      )}">
+      <meta property="og:url" content="${publicUrl}">
+      <meta property="og:type" content="website">
+      <meta property="og:site_name" content="Annotation Hub">
+      <meta property="og:image" content="${publicUrl}preview.jpg">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
 
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${this.escapeHtml(originalTitle)}">
-<meta name="twitter:description" content="${this.escapeHtml(
-      metadata.description || "An annotated image"
-    )}">
-<meta name="twitter:image" content="${previewImageUrl}">
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="${this.escapeHtml(originalTitle)}">
+      <meta name="twitter:description" content="${this.escapeHtml(
+        metadata.description || "An annotated image"
+      )}">
+      <meta name="twitter:image" content="${publicUrl}preview.jpg">
 
-<meta name="description" content="${this.escapeHtml(
-      metadata.description || "An annotated image"
-    )}">
-        `.trim();
+      <meta name="description" content="${this.escapeHtml(
+        metadata.description || "An annotated image"
+      )}">
+    `.trim();
 
     // Preserve the original HTML structure, just enhance the head
     let enhancedHtml = originalHtml;
@@ -475,39 +549,39 @@ class AnnotationManager {
   createInstructions(folderName, metadata) {
     return `# Annotation: ${metadata.originalName}
 
-## Files Included:
-- \`index.html\` - Your annotation file with social media meta tags
-- \`preview.jpg\` - Generated preview image for social sharing
+      ## Files Included:
+      - \`index.html\` - Your annotation file with social media meta tags
+      - \`preview.jpg\` - Generated preview image for social sharing
 
-## Deployment Steps:
+      ## Deployment Steps:
 
-1. **Extract the zip file**
-2. **Upload to your GitHub repository:**
-   \`\`\`bash
-   # Create the folder structure
-   mkdir -p annotations/${folderName}
-   
-   # Copy the extracted files
-   cp ${folderName}/* annotations/${folderName}/
-   
-   # Add to git
-   git add annotations/${folderName}/
-   
-   # Commit
-   git commit -m "feat: add annotation ${folderName}"
-   
-   # Push to GitHub
-   git push origin main
-   \`\`\`
+      1. **Extract the zip file**
+      2. **Upload to your GitHub repository:**
+        \`\`\`bash
+        # Create the folder structure
+        mkdir -p annotations/${folderName}
+        
+        # Copy the extracted files
+        cp ${folderName}/* annotations/${folderName}/
+        
+        # Add to git
+        git add annotations/${folderName}/
+        
+        # Commit
+        git commit -m "feat: add annotation ${folderName}"
+        
+        # Push to GitHub
+        git push origin main
+        \`\`\`
 
-3. **Your annotation will be live at:**
-   ${this.generatePublicUrl(folderName)}
+      3. **Your annotation will be live at:**
+        ${this.generatePublicUrl(folderName)}
 
-4. **Test the social media preview:**
-   - Share the link on WhatsApp, Twitter, or Facebook
-   - It should show the title, description, and preview image
-   - Use Facebook Sharing Debugger to test: https://developers.facebook.com/tools/debug/
-`;
+      4. **Test the social media preview:**
+        - Share the link on WhatsApp, Twitter, or Facebook
+        - It should show the title, description, and preview image
+        - Use Facebook Sharing Debugger to test: https://developers.facebook.com/tools/debug/
+      `;
   }
 
   async extractFirstImage(htmlContent, folderName) {
@@ -721,6 +795,7 @@ class AnnotationManager {
   generatePublicUrl(folderName) {
     const baseUrl = window.location.origin + window.location.pathname;
     const basePath = baseUrl.replace("index.html", "");
+    // FIXED: Ensure it ends with slash for folder structure
     return `${basePath}annotations/${folderName}/`;
   }
 
