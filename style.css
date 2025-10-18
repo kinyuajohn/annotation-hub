@@ -892,3 +892,19 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+.url-item.featured {
+    border-color: var(--accent-color);
+    background: #f0f9ff;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+.url-item.featured label {
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.url-item.featured small {
+    color: var(--accent-color);
+    font-weight: 500;
+}
