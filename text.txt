@@ -1,0 +1,11 @@
+annotation-hub/
+├── index.html              # Upload interface
+├── manager.html            # File management dashboard
+├── style.css
+├── script.js
+├── upload-handler.php      # Or a GitHub Actions alternative
+├── annotations/            # Folder for uploaded HTML files
+│   ├── annotation-abc123.html
+│   └── annotation-xyz789.html
+├── metadata.json           # Our "database" file
+└── cleanup.js              # Expiry cleanup script

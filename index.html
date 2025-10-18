@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Annotation Hub - Upload & Share Annotations</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-content">
+          <h1 class="logo">
+            <span class="logo-icon">📋</span>
+            Annotation Hub
+          </h1>
+          <p class="tagline">Upload, share, and manage your annotated images</p>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="upload-card">
+          <div class="card-header">
+            <h2>Upload Annotation</h2>
+            <p>Share your annotated images with shareable links</p>
+          </div>
+
+          <form id="uploadForm" class="upload-form">
+            <!-- File Upload Area -->
+            <div class="upload-section">
+              <div class="upload-area" id="uploadArea">
+                <input
+                  type="file"
+                  id="fileInput"
+                  accept=".html"
+                  class="file-input"
+                  required
+                />
+                <div class="upload-content" id="uploadContent">
+                  <div class="upload-icon">📁</div>
+                  <h3>Drop your HTML file here</h3>
+                  <p>or click to browse</p>
+                  <span class="file-types">Supports .html files</span>
+                </div>
+                <div
+                  class="file-preview"
+                  id="filePreview"
+                  style="display: none"
+                >
+                  <div class="file-info">
+                    <div class="file-icon">📄</div>
+                    <div class="file-details">
+                      <h4 id="fileName">filename.html</h4>
+                      <span id="fileSize">0 KB</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="change-file-btn"
+                    onclick="document.getElementById('fileInput').click()"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Form Fields -->
+            <div class="form-fields">
+              <div class="form-group">
+                <label for="expiryDate" class="form-label">
+                  <span class="label-icon">📅</span>
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  id="expiryDate"
+                  class="form-input"
+                  required
+                />
+                <small class="form-help"
+                  >The annotation will automatically expire on this date</small
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="customSlug" class="form-label">
+                  <span class="label-icon">🔗</span>
+                  Custom URL (optional)
+                </label>
+                <div class="url-input-group">
+                  <span class="url-prefix">annotation-hub/</span>
+                  <input
+                    type="text"
+                    id="customSlug"
+                    class="form-input url-input"
+                    placeholder="my-annotation"
+                  />
+                  <span class="url-suffix">.html</span>
+                </div>
+                <small class="form-help"
+                  >Customize the link for easy sharing</small
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="previewDescription" class="form-label">
+                  <span class="label-icon">📝</span>
+                  Description
+                </label>
+                <textarea
+                  id="previewDescription"
+                  class="form-textarea"
+                  placeholder="Add a description for link previews..."
+                ></textarea>
+                <small class="form-help"
+                  >This appears when sharing the link on social media</small
+                >
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="submit-btn">
+              <span class="btn-icon">🚀</span>
+              Generate Shareable Link
+            </button>
+          </form>
+        </div>
+
+        <!-- Results Section -->
+        <div class="result-card" id="resultCard" style="display: none">
+          <div class="success-header">
+            <div class="success-icon">✅</div>
+            <h2>Annotation Ready to Share!</h2>
+            <p>Your file has been processed and is ready for sharing</p>
+          </div>
+
+          <!-- Shareable Link -->
+          <div class="link-section">
+            <label class="section-label">Shareable Link</label>
+            <div class="link-container">
+              <input
+                type="text"
+                id="shareableLink"
+                class="link-input"
+                readonly
+              />
+              <button class="copy-btn" onclick="copyLink()">
+                <span class="btn-icon">📋</span>
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <!-- Link Preview -->
+          <div class="preview-section">
+            <label class="section-label">Link Preview</label>
+            <div class="link-preview" id="linkPreview">
+              <div class="preview-image">
+                <div class="image-placeholder">🖼️</div>
+              </div>
+              <div class="preview-content">
+                <h4 id="previewTitle">Annotation Preview</h4>
+                <p id="previewDesc">No description provided</p>
+                <span class="preview-url" id="previewUrl">example.com</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Next Steps -->
+          <div class="steps-section">
+            <h3 class="steps-title">Next Steps</h3>
+            <div class="steps-grid">
+              <div class="step-item">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h4>Save the File</h4>
+                  <p>The HTML file has been downloaded to your computer</p>
+                </div>
+              </div>
+              <div class="step-item">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h4>Add to Repository</h4>
+                  <p>Move the file to your <code>annotations/</code> folder</p>
+                </div>
+              </div>
+              <div class="step-item">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h4>Deploy to GitHub</h4>
+                  <p>Commit and push your changes to make it live</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Git Commands -->
+          <div class="git-section">
+            <button class="git-toggle-btn" onclick="toggleGitCommands()">
+              <span class="btn-icon">💻</span>
+              Show Git Commands
+            </button>
+            <div class="git-commands" id="gitCommands" style="display: none">
+              <div class="command-block">
+                <code class="command">git add annotations/</code>
+                <span class="command-desc">Add all new annotation files</span>
+              </div>
+              <div class="command-block">
+                <code class="command"
+                  >git commit -m "feat: add new annotation"</code
+                >
+                <span class="command-desc"
+                  >Commit with descriptive message</span
+                >
+              </div>
+              <div class="command-block">
+                <code class="command">git push origin main</code>
+                <span class="command-desc">Deploy to GitHub Pages</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="action-buttons">
+            <button class="action-btn secondary" onclick="resetForm()">
+              <span class="btn-icon">📤</span>
+              Upload Another
+            </button>
+            <button class="action-btn" onclick="openFileManager()">
+              <span class="btn-icon">📊</span>
+              Manage Files
+            </button>
+            <button class="action-btn primary" onclick="testLink()">
+              <span class="btn-icon">🔗</span>
+              Test Link
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="app-footer">
+        <p>
+          Powered by GitHub Pages •
+          <a href="manager.html">Manage Annotations</a>
+        </p>
+      </footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
