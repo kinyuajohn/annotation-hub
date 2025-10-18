@@ -510,46 +510,81 @@ class AnnotationManager {
   }
 
   async shortenUrl(longUrl) {
-    try {
-      // Primary: Shrtcode API (very reliable, no ads, no warnings)
-      const response = await fetch(
-        `https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(longUrl)}`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.ok && data.result) {
-          // Returns links like: https://shrtco.de/abc123
-          return data.result.full_short_link;
-        }
-      }
-    } catch (error) {
-      console.warn("Shrtcode failed:", error);
+    // Normalize & sanity check
+    if (!/^https?:\/\//i.test(longUrl)) {
+      // browsers/shorteners will reject protocol-relative; force https
+      longUrl = "https://" + longUrl.replace(/^\/+/, "");
     }
 
-    try {
-      // Fallback: CleanURI API
-      const response = await fetch("https://cleanuri.com/api/v1/shorten", {
+    // Helper: POST form-encoded
+    const postForm = (url, paramsObj) =>
+      fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         },
-        body: JSON.stringify({ url: longUrl }),
+        body: new URLSearchParams(paramsObj).toString(),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.result_url) {
-          // Returns links like: https://cleanuri.com/abc123
-          return data.result_url;
-        }
+    // 1) shrtco.de (GET). May be CORS-limited depending on environment.
+    try {
+      const r = await fetch(
+        `https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(longUrl)}`
+      );
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.ok && data?.result?.full_short_link)
+          return data.result.full_short_link;
       }
-    } catch (error) {
-      console.warn("CleanURI failed:", error);
+    } catch (e) {
+      console.warn("Shrtcode failed:", e);
     }
 
-    // Final fallback: Return original URL
-    console.warn("URL shortening services unavailable, using original URL");
+    // 2) CleanURI (must be form-url-encoded, NOT JSON)
+    try {
+      const r = await postForm("https://cleanuri.com/api/v1/shorten", {
+        url: longUrl,
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.result_url) return data.result_url;
+      } else {
+        console.warn("CleanURI HTTP error:", r.status);
+      }
+    } catch (e) {
+      console.warn("CleanURI failed:", e);
+    }
+
+    // 3) da.gd (simple & usually CORS-friendly). Returns plain text.
+    try {
+      // Either POST form-encoded or GET with query param
+      const r = await postForm("https://da.gd/shorten", { url: longUrl });
+      if (r.ok) {
+        const txt = (await r.text()).trim();
+        if (/^https?:\/\//i.test(txt)) return txt;
+      }
+    } catch (e) {
+      console.warn("da.gd failed:", e);
+    }
+
+    // 4) TinyURL (token-based official API). If you have a token, uncomment:
+    // try {
+    //   const r = await fetch('https://api.tinyurl.com/create', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Authorization': 'Bearer YOUR_TINYURL_API_TOKEN',
+    //       'Content-Type': 'application/json'
+    //     },
+    //     body: JSON.stringify({ url: longUrl, domain: 'tinyurl.com' })
+    //   });
+    //   if (r.ok) {
+    //     const data = await r.json();
+    //     const out = data?.data?.tiny_url;
+    //     if (out) return out;
+    //   }
+    // } catch (e) { console.warn('TinyURL failed:', e); }
+
+    console.warn("All shorteners unavailable; returning original URL.");
     return longUrl;
   }
 
@@ -1132,8 +1167,8 @@ class AnnotationManager {
 
   generatePublicUrl(folderName) {
     const baseUrl = window.location.origin + window.location.pathname;
-    const basePath = baseUrl.replace("index.html", "");
-    // FIXED: Ensure it ends with slash for folder structure
+    const basePath = baseUrl.replace(/index\.html?$/i, "");
+    // Keep trailing slash so references like `${publicUrl}preview.jpg` work predictably
     return `${basePath}annotations/${folderName}/`;
   }
 
@@ -1207,11 +1242,11 @@ class AnnotationManager {
     URL.revokeObjectURL(url);
   }
 
-  generatePublicUrl(fileName) {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const basePath = baseUrl.replace("index.html", "");
-    return `${basePath}annotations/${fileName}`;
-  }
+  // generatePublicUrl(fileName) {
+  //   const baseUrl = window.location.origin + window.location.pathname;
+  //   const basePath = baseUrl.replace("index.html", "");
+  //   return `${basePath}annotations/${fileName}`;
+  // }
 
   showLoading(message = "Processing file...") {
     // Create or show loading message
