@@ -190,6 +190,7 @@ class AnnotationManager {
   }
 
   escapeHtml(text) {
+    if (!text) return "";
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
@@ -218,18 +219,38 @@ class AnnotationManager {
 
       const fileId = this.generateFileId();
       const folderName = customSlug || `annotation-${fileId}`;
-      const fileName = "index.html";
 
       let fileContent = await this.readFileAsText(file);
 
-      // Extract the first image from the HTML
-      const imageData = await this.extractFirstImage(fileContent, folderName);
+      // Extract title from original content
+      const title =
+        this.extractTitle(fileContent) || file.name.replace(".html", "");
 
-      // Generate metadata
+      // Generate preview image
+      const previewImageData = await this.generatePreviewImage(
+        title,
+        description
+      );
+
+      // Create the folder structure files
+      await this.createAnnotationFiles(
+        folderName,
+        fileContent,
+        previewImageData,
+        {
+          title: title,
+          description: description,
+          expiryDate: expiryDate,
+          originalName: file.name,
+          fileId: fileId,
+          customSlug: customSlug,
+        }
+      );
+
+      // Save metadata
       const metadata = {
         id: fileId,
         folderName: folderName,
-        fileName: fileName,
         originalName: file.name,
         expiryDate: expiryDate,
         created: new Date().toISOString(),
@@ -237,23 +258,7 @@ class AnnotationManager {
         description: description,
         publicUrl: this.generatePublicUrl(folderName),
         fileSize: this.formatFileSize(file.size),
-        hasPreviewImage: !!imageData,
       };
-
-      // Generate enhanced HTML with proper meta tags
-      const enhancedContent = this.generateEnhancedHTML(
-        fileContent,
-        metadata,
-        imageData
-      );
-
-      // Create a zip file containing both HTML and image
-      await this.createAnnotationPackage(
-        folderName,
-        enhancedContent,
-        imageData,
-        metadata
-      );
 
       this.metadata[fileId] = metadata;
       this.saveMetadata();
@@ -262,6 +267,247 @@ class AnnotationManager {
       console.error("Upload error:", error);
       this.showError("Error processing file: " + error.message);
     }
+  }
+
+  extractTitle(htmlContent) {
+    const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/i);
+    if (titleMatch) {
+      return titleMatch[1].replace(/<[^>]*>/g, "").trim();
+    }
+
+    // Try to find h1 tag
+    const h1Match = htmlContent.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    if (h1Match) {
+      return h1Match[1].replace(/<[^>]*>/g, "").trim();
+    }
+
+    return null;
+  }
+
+  async generatePreviewImage(title, description) {
+    return new Promise((resolve) => {
+      // Create offscreen canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 630;
+      const ctx = canvas.getContext("2d");
+
+      // Background gradient
+      const gradient = ctx.createLinearGradient(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+      gradient.addColorStop(0, "#667eea");
+      gradient.addColorStop(1, "#764ba2");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Add annotation icon
+      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+      ctx.font = "bold 80px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("📋", canvas.width / 2, 120);
+
+      // Add title
+      ctx.font = 'bold 56px "Inter", Arial, sans-serif';
+      ctx.fillStyle = "#ffffff";
+      this.wrapText(ctx, title, canvas.width / 2, 220, canvas.width - 200, 65);
+
+      // Add description
+      if (description) {
+        ctx.font = '32px "Inter", Arial, sans-serif';
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        this.wrapText(
+          ctx,
+          description,
+          canvas.width / 2,
+          350,
+          canvas.width - 200,
+          40
+        );
+      }
+
+      // Add website URL
+      ctx.font = '24px "Inter", Arial, sans-serif';
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.fillText("Annotation Hub", canvas.width / 2, 530);
+
+      // Convert to data URL
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      resolve(dataUrl);
+    });
+  }
+
+  wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(" ");
+    let line = "";
+    let lines = [];
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + " ";
+      const metrics = ctx.measureText(testLine);
+      const testWidth = metrics.width;
+
+      if (testWidth > maxWidth && n > 0) {
+        lines.push(line);
+        line = words[n] + " ";
+      } else {
+        line = testLine;
+      }
+    }
+    lines.push(line);
+
+    // Draw lines
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i].trim(), x, y + i * lineHeight);
+    }
+
+    return lines;
+  }
+
+  async createAnnotationFiles(
+    folderName,
+    originalHtml,
+    previewImageData,
+    metadata
+  ) {
+    // Create enhanced HTML with proper meta tags
+    const enhancedHtml = this.createEnhancedHTML(
+      originalHtml,
+      folderName,
+      metadata
+    );
+
+    // Create a zip file with both files
+    const zip = new JSZip();
+
+    // Add the enhanced HTML file
+    zip.file(`${folderName}/index.html`, enhancedHtml);
+
+    // Convert data URL to blob and add preview image
+    const previewBlob = this.dataURLtoBlob(previewImageData);
+    zip.file(`${folderName}/preview.jpg`, previewBlob);
+
+    // Create instructions file
+    const instructions = this.createInstructions(folderName, metadata);
+    zip.file(`${folderName}/README.md`, instructions);
+
+    // Generate and download zip
+    const zipContent = await zip.generateAsync({ type: "blob" });
+    this.downloadFile(`${folderName}.zip`, zipContent);
+  }
+
+  createEnhancedHTML(originalHtml, folderName, metadata) {
+    const publicUrl = this.generatePublicUrl(folderName);
+    const previewImageUrl = `${publicUrl}preview.jpg`;
+
+    // Extract the original title or use fallback
+    const originalTitle = this.extractTitle(originalHtml) || metadata.title;
+
+    // Create enhanced meta tags
+    const metaTags = `
+<!-- Social Media Preview Tags -->
+<meta property="og:title" content="${this.escapeHtml(originalTitle)}">
+<meta property="og:description" content="${this.escapeHtml(
+      metadata.description || "An annotated image"
+    )}">
+<meta property="og:url" content="${publicUrl}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Annotation Hub">
+<meta property="og:image" content="${previewImageUrl}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${this.escapeHtml(originalTitle)}">
+<meta name="twitter:description" content="${this.escapeHtml(
+      metadata.description || "An annotated image"
+    )}">
+<meta name="twitter:image" content="${previewImageUrl}">
+
+<meta name="description" content="${this.escapeHtml(
+      metadata.description || "An annotated image"
+    )}">
+        `.trim();
+
+    // Preserve the original HTML structure, just enhance the head
+    let enhancedHtml = originalHtml;
+
+    // Remove existing meta tags to avoid duplicates
+    enhancedHtml = enhancedHtml
+      .replace(/<meta property="og:[^>]*>/gi, "")
+      .replace(/<meta name="twitter:[^>]*>/gi, "")
+      .replace(/<meta name="description"[^>]*>/gi, "");
+
+    // Check if there's a head section
+    if (enhancedHtml.includes("</head>")) {
+      // Insert before closing head tag
+      enhancedHtml = enhancedHtml.replace(
+        /<\/head>/i,
+        `\n${metaTags}\n</head>`
+      );
+    } else if (enhancedHtml.includes("<head>")) {
+      // Insert after opening head tag
+      enhancedHtml = enhancedHtml.replace(/<head>/i, `<head>\n${metaTags}`);
+    } else {
+      // Create head section at the beginning
+      enhancedHtml = `<!DOCTYPE html>\n<html>\n<head>\n${metaTags}\n</head>\n${enhancedHtml}`;
+    }
+
+    return enhancedHtml;
+  }
+
+  dataURLtoBlob(dataURL) {
+    const byteString = atob(dataURL.split(",")[1]);
+    const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+
+    return new Blob([ab], { type: mimeString });
+  }
+
+  createInstructions(folderName, metadata) {
+    return `# Annotation: ${metadata.originalName}
+
+## Files Included:
+- \`index.html\` - Your annotation file with social media meta tags
+- \`preview.jpg\` - Generated preview image for social sharing
+
+## Deployment Steps:
+
+1. **Extract the zip file**
+2. **Upload to your GitHub repository:**
+   \`\`\`bash
+   # Create the folder structure
+   mkdir -p annotations/${folderName}
+   
+   # Copy the extracted files
+   cp ${folderName}/* annotations/${folderName}/
+   
+   # Add to git
+   git add annotations/${folderName}/
+   
+   # Commit
+   git commit -m "feat: add annotation ${folderName}"
+   
+   # Push to GitHub
+   git push origin main
+   \`\`\`
+
+3. **Your annotation will be live at:**
+   ${this.generatePublicUrl(folderName)}
+
+4. **Test the social media preview:**
+   - Share the link on WhatsApp, Twitter, or Facebook
+   - It should show the title, description, and preview image
+   - Use Facebook Sharing Debugger to test: https://developers.facebook.com/tools/debug/
+`;
   }
 
   async extractFirstImage(htmlContent, folderName) {
@@ -537,12 +783,11 @@ class AnnotationManager {
     });
   }
 
-  downloadFile(fileName, content) {
-    const blob = new Blob([content], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
+  downloadFile(filename, content) {
+    const url = URL.createObjectURL(content);
     const a = document.createElement("a");
     a.href = url;
-    a.download = fileName;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
