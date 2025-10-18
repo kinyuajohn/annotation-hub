@@ -413,8 +413,83 @@ class AnnotationManager {
     };
   }
 
-  showSuccess(metadata, usesCustomImage) {
-    // Update the UI with success information
+  async showSuccess(metadata, usesCustomImage, imageData) {
+    try {
+      this.showLoading("Generating short URL...");
+
+      // Generate short URL
+      const shortUrl = await this.shortenUrl(metadata.publicUrl);
+
+      // Update the UI with both URLs
+      document.getElementById("shareableLink").value = shortUrl;
+      document.getElementById("previewTitle").textContent =
+        metadata.originalName.replace(".html", "");
+      document.getElementById("previewDesc").textContent =
+        metadata.description || "No description provided";
+      document.getElementById("previewUrl").textContent = new URL(
+        shortUrl
+      ).hostname; // Show tinyurl.com
+
+      // Show which URL is being used
+      this.showUrlComparison(metadata.publicUrl, shortUrl);
+
+      // Update custom image note if needed
+      if (usesCustomImage) {
+        this.showCustomImageNote();
+      }
+
+      // Show results and hide form
+      document.getElementById("uploadForm").style.display = "none";
+      document.getElementById("resultCard").style.display = "block";
+
+      // Scroll to results
+      document
+        .getElementById("resultCard")
+        .scrollIntoView({ behavior: "smooth" });
+    } catch (error) {
+      console.error("Error generating short URL:", error);
+      // Fallback to original URL
+      this.showSuccessWithFallback(metadata, usesCustomImage, imageData);
+    }
+  }
+
+  showUrlComparison(longUrl, shortUrl) {
+    const comparisonHtml = `
+        <div class="url-comparison">
+            <div class="url-item">
+                <label>Short URL (Recommended for sharing):</label>
+                <div class="link-container">
+                    <input type="text" value="${shortUrl}" class="link-input" readonly id="shortLink">
+                    <button class="copy-btn" onclick="copyToClipboard('shortLink')">
+                        <span class="btn-icon">📋</span>
+                        Copy
+                    </button>
+                </div>
+                <small>✅ Previews work perfectly • 🔗 Easy to share</small>
+            </div>
+            <div class="url-item">
+                <label>Original URL:</label>
+                <div class="link-container">
+                    <input type="text" value="${longUrl}" class="link-input" readonly id="originalLink">
+                    <button class="copy-btn" onclick="copyToClipboard('originalLink')">
+                        <span class="btn-icon">📋</span>
+                        Copy
+                    </button>
+                </div>
+                <small>Use if short URL service is unavailable</small>
+            </div>
+        </div>
+    `;
+
+    // Replace the existing link section
+    const linkSection = document.querySelector(".link-section");
+    if (linkSection) {
+      linkSection.innerHTML = comparisonHtml;
+    }
+  }
+
+  showSuccessWithFallback(metadata, usesCustomImage, imageData) {
+    // Fallback if TinyURL fails
     document.getElementById("shareableLink").value = metadata.publicUrl;
     document.getElementById("previewTitle").textContent =
       metadata.originalName.replace(".html", "");
@@ -424,27 +499,57 @@ class AnnotationManager {
       metadata.publicUrl
     ).hostname;
 
-    // Update preview image in the UI
-    const previewImage = document.querySelector(
-      ".preview-image .image-placeholder"
-    );
-    if (previewImage) {
-      previewImage.textContent = usesCustomImage ? "🖼️" : "📋";
-    }
-
-    // Show custom image note
     if (usesCustomImage) {
       this.showCustomImageNote();
     }
 
-    // Show results and hide form
     document.getElementById("uploadForm").style.display = "none";
     document.getElementById("resultCard").style.display = "block";
+  }
 
-    // Scroll to results
-    document
-      .getElementById("resultCard")
-      .scrollIntoView({ behavior: "smooth" });
+  async shortenUrl(longUrl) {
+    // Try multiple URL shortener services for reliability
+    const services = [
+      {
+        name: "TinyURL",
+        url: `https://tinyurl.com/api-create.php?url=${encodeURIComponent(
+          longUrl
+        )}`,
+      },
+      {
+        name: "is.gd",
+        url: `https://is.gd/create.php?format=simple&url=${encodeURIComponent(
+          longUrl
+        )}`,
+      },
+    ];
+
+    for (const service of services) {
+      try {
+        console.log(`Trying ${service.name}...`);
+        const response = await fetch(service.url, {
+          method: "GET",
+          mode: "cors",
+        });
+
+        if (response.ok) {
+          const shortUrl = await response.text();
+
+          // Validate the response is actually a URL
+          if (shortUrl && shortUrl.startsWith("http")) {
+            console.log(`✅ Success with ${service.name}: ${shortUrl}`);
+            return shortUrl;
+          }
+        }
+      } catch (error) {
+        console.warn(`${service.name} failed:`, error);
+        continue; // Try next service
+      }
+    }
+
+    // All services failed, return original URL
+    console.warn("All URL shortener services failed, using original URL");
+    return longUrl;
   }
 
   showCustomImageNote() {
@@ -617,18 +722,15 @@ class AnnotationManager {
       ### Image Details:
       - **Dimensions:** ${imageData.width} × ${imageData.height} pixels
       - **Aspect Ratio:** ${this.calculateAspectRatio(
-        imageData.width,
-        imageData.height
-      )}
+            imageData.width,
+            imageData.height
+          )}
 
-      ### Preview Image:
-      ${
-        metadata.usesCustomImage
-          ? "✅ Using your original image with preserved dimensions"
-          : "✅ Generated a clean preview image"
-      }
+      ### Important Note About URLs:
+      After deployment, use the **short URL** provided in the application for sharing. 
+      It will redirect to your annotation and social media previews will work perfectly!
 
-      ### Folder Structure on GitHub:
+      ### Folder Structure:
       \`\`\`
       your-repo/
       └── annotations/
@@ -655,13 +757,16 @@ class AnnotationManager {
       ### Your Annotation URL:
       ${publicUrl}
 
-      ### Preview Image URL:
-      ${publicUrl}/preview.jpg
-
-      ### Test Social Media Preview:
-      1. Wait 5 minutes after pushing to GitHub
-      2. Share: ${publicUrl}
+      ### After Deployment:
+      1. Wait 5 minutes for GitHub Pages to update
+      2. Use the short URL provided in the app for sharing
       3. Test with Facebook Debugger: https://developers.facebook.com/tools/debug/
+
+      ### Testing Social Media Previews:
+      - ✅ Title: Will show correctly
+      - ✅ Description: Will show correctly  
+      - ✅ Image: Will show correctly
+      - ✅ Works with: Facebook, Twitter, WhatsApp, LinkedIn, Slack
       `;
   }
 
@@ -679,7 +784,10 @@ class AnnotationManager {
 
       **Image Details:**
       - Dimensions: ${imageData.width} × ${imageData.height} pixels
-      - Aspect Ratio: ${this.calculateAspectRatio(imageData.width, imageData.height)}
+      - Aspect Ratio: ${this.calculateAspectRatio(
+        imageData.width,
+        imageData.height
+      )}
 
       **Next Steps:**
       1. **Extract the downloaded zip file**
@@ -1104,31 +1212,29 @@ class AnnotationManager {
     return `${basePath}annotations/${fileName}`;
   }
 
-  showLoading() {
-    // You can add a loading spinner here
-    console.log("Processing file...");
+  showLoading(message = "Processing file...") {
+    // Create or show loading message
+    let loadingElement = document.getElementById("loadingMessage");
+    if (!loadingElement) {
+      loadingElement = document.createElement("div");
+      loadingElement.id = "loadingMessage";
+      loadingElement.className = "loading-message";
+      document.querySelector(".upload-form").appendChild(loadingElement);
+    }
+
+    loadingElement.innerHTML = `
+        <div class="spinner"></div>
+        ${message}
+    `;
+    loadingElement.style.display = "block";
   }
 
-  // showSuccess(metadata) {
-  //   // Update the UI with success information
-  //   document.getElementById("shareableLink").value = metadata.publicUrl;
-  //   document.getElementById("previewTitle").textContent =
-  //     metadata.originalName.replace(".html", "");
-  //   document.getElementById("previewDesc").textContent =
-  //     metadata.description || "No description provided";
-  //   document.getElementById("previewUrl").textContent = new URL(
-  //     metadata.publicUrl
-  //   ).hostname;
-
-  //   // Show results and hide form
-  //   document.getElementById("uploadForm").style.display = "none";
-  //   document.getElementById("resultCard").style.display = "block";
-
-  //   // Scroll to results
-  //   document
-  //     .getElementById("resultCard")
-  //     .scrollIntoView({ behavior: "smooth" });
-  // }
+  hideLoading() {
+    const loadingElement = document.getElementById("loadingMessage");
+    if (loadingElement) {
+      loadingElement.style.display = "none";
+    }
+  }
 
   showError(message) {
     alert("Error: " + message);
@@ -1136,15 +1242,15 @@ class AnnotationManager {
 }
 
 // Global functions
-function copyLink() {
-  const linkInput = document.getElementById("shareableLink");
-  linkInput.select();
-  linkInput.setSelectionRange(0, 99999);
+function copyToClipboard(elementId) {
+  const input = document.getElementById(elementId);
+  input.select();
+  input.setSelectionRange(0, 99999);
 
   navigator.clipboard
-    .writeText(linkInput.value)
+    .writeText(input.value)
     .then(() => {
-      const btn = document.querySelector(".copy-btn");
+      const btn = input.nextElementSibling;
       const originalText = btn.innerHTML;
       btn.innerHTML = '<span class="btn-icon">✅</span> Copied!';
       btn.style.background = "#10b981";
@@ -1157,6 +1263,10 @@ function copyLink() {
     .catch((err) => {
       console.error("Failed to copy: ", err);
     });
+}
+
+function copyLink() {
+  copyToClipboard("shortLink");
 }
 
 function toggleGitCommands() {

@@ -833,3 +833,62 @@ body {
     margin: 0;
     font-size: 0.9rem;
 }
+
+.url-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.url-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    background: var(--secondary-color);
+}
+
+.url-item:first-child {
+    border-color: var(--accent-color);
+    background: #f0f9ff;
+}
+
+.url-item label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.url-item small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+.url-item:first-child small {
+    color: var(--accent-color);
+}
+
+/* Loading state for URL shortening */
+.loading-message {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-secondary);
+}
+
+.loading-message .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 0.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
