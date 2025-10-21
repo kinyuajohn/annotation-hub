@@ -1,14 +1,14 @@
 # Deployment Instructions
 
-      ## Your Annotation: sunday-service.html
+      ## Your Annotation: Santana Show House (2).html
 
       ### Files to Upload:
       - `index.html` - Your annotation with social media tags
-      - `preview.jpg` - Custom uploaded image (736×920)
+      - `preview.jpg` - Custom uploaded image (1080×1429)
 
       ### Image Details:
-      - **Dimensions:** 736 × 920 pixels
-      - **Aspect Ratio:** 4:5
+      - **Dimensions:** 1080 × 1429 pixels
+      - **Aspect Ratio:** 1080:1429
 
       ### Important Note About URLs:
       After deployment, use the **short URL** provided in the application for sharing. 
@@ -18,7 +18,7 @@
       ```
       your-repo/
       └── annotations/
-          └── test/
+          └── santana-unveiling/
               ├── index.html
               └── preview.jpg
       ```
@@ -29,17 +29,17 @@
       cd your-repo-name
 
       # Create the folder and add files
-      mkdir -p annotations/test
-      cp test/* annotations/test/
+      mkdir -p annotations/santana-unveiling
+      cp santana-unveiling/* annotations/santana-unveiling/
 
       # Commit and push
-      git add annotations/test/
-      git commit -m "Add annotation: test"
+      git add annotations/santana-unveiling/
+      git commit -m "Add annotation: santana-unveiling"
       git push origin main
       ```
 
       ### Your Annotation URL:
-      https://kinyuajohn.github.io/annotation-hub/annotations/test/
+      https://kinyuajohn.github.io/annotation-hub/annotations/santana-unveiling/
 
       ### After Deployment:
       1. Wait 5 minutes for GitHub Pages to update

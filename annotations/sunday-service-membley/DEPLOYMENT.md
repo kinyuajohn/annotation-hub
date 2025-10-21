@@ -1,14 +1,14 @@
 # Deployment Instructions
 
-      ## Your Annotation: Sunday Service.html
+      ## Your Annotation: Sunday Service (1).html
 
       ### Files to Upload:
       - `index.html` - Your annotation with social media tags
-      - `preview.jpg` - Custom uploaded image (736×920)
+      - `preview.jpg` - Custom uploaded image (1331×1440)
 
       ### Image Details:
-      - **Dimensions:** 736 × 920 pixels
-      - **Aspect Ratio:** 4:5
+      - **Dimensions:** 1331 × 1440 pixels
+      - **Aspect Ratio:** 1331:1440
 
       ### Important Note About URLs:
       After deployment, use the **short URL** provided in the application for sharing. 
@@ -18,7 +18,7 @@
       ```
       your-repo/
       └── annotations/
-          └── testing-tinyurl/
+          └── sunday-service-membley/
               ├── index.html
               └── preview.jpg
       ```
@@ -29,17 +29,17 @@
       cd your-repo-name
 
       # Create the folder and add files
-      mkdir -p annotations/testing-tinyurl
-      cp testing-tinyurl/* annotations/testing-tinyurl/
+      mkdir -p annotations/sunday-service-membley
+      cp sunday-service-membley/* annotations/sunday-service-membley/
 
       # Commit and push
-      git add annotations/testing-tinyurl/
-      git commit -m "Add annotation: testing-tinyurl"
+      git add annotations/sunday-service-membley/
+      git commit -m "Add annotation: sunday-service-membley"
       git push origin main
       ```
 
       ### Your Annotation URL:
-      https://kinyuajohn.github.io/annotation-hub/annotations/testing-tinyurl
+      https://kinyuajohn.github.io/annotation-hub/annotations/sunday-service-membley/
 
       ### After Deployment:
       1. Wait 5 minutes for GitHub Pages to update
